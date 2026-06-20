@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      # Примечание: restful-api.dev — публичный API с лимитом 50 запросов/день на IP.
+      # Workflow триггерится только на push/PR в main и вручную (workflow_dispatch),
+      # а не на каждый коммит в фиче-ветках, чтобы не расходовать квоту впустую.
+      - name: Run tests
+        run: mvn clean test
+
+      - name: Generate Allure report
+        if: always()
+        run: |
+          mvn io.qameta.allure:allure-maven:2.14.0:report || true
+
+      - name: Upload Allure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: target/site/allure-maven-plugin
+          retention-days: 14
+
+      - name: Upload Surefire test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports
+          retention-days: 14
